@@ -39,13 +39,9 @@
 
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
-from pyspark.sql.functions import lit
 import configparser
+import random, os, sys
 from datetime import datetime
-import os
-import random
-from datetime import datetime
-import sys
 from sedona.spark import *
 
 ## CDE PROPERTIES

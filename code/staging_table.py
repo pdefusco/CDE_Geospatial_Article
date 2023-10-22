@@ -37,19 +37,12 @@
 # #  Author(s): Paul de Fusco
 #***************************************************************************/
 
-import random
-import configparser
-import json
-import sys
-import os
 from os.path import exists
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
-from pyspark.sql.functions import lit
 from utils import *
 from datetime import datetime
-import sys
-import random
+import sys, random, os, json, random, configparser
 from sedona.spark import *
 
 ## CDE PROPERTIES
@@ -94,7 +87,7 @@ print("\n")
 
 dg = DataGen(spark, username)
 
-iot_points_df = dg.iot_points_gen()
+iot_points_df = dg.iot_points_gen(row_count = 10000, unique_vals=10000)
 iot_points_df.createOrReplaceTempView("iot_geo_tmp")
 
 iot_points_geo_df = sedona.sql("select id, device_id, manufacturer, event_type, event_ts, ST_Point(cast(iot_geo_tmp.latitude as Decimal(24,20)), cast(iot_geo_tmp.longitude as Decimal(24,20))) as arealandmark from iot_geo_tmp")

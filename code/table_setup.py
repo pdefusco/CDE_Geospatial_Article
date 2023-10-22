@@ -37,11 +37,7 @@
 # #  Author(s): Paul de Fusco
 #***************************************************************************/
 
-import random
-import configparser
-import json
-import sys
-import os
+import random, configparser, json, sys, os
 from os.path import exists
 from pyspark.sql import SparkSession
 from sedona.spark import *
