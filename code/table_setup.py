@@ -44,8 +44,8 @@ import sys
 import os
 from os.path import exists
 from pyspark.sql import SparkSession
-from utils import *
 from sedona.spark import *
+from utils import *
 
 ## CDE PROPERTIES
 config = configparser.ConfigParser()
@@ -111,7 +111,7 @@ print("\n")
 print("CREATING COUNTRIES TABLE \n")
 print("\n")
 
-countries = ShapefileReader.readToGeometryRDD(sc, "/app/mount")
+countries = ShapefileReader.readToGeometryRDD(sc, "/app/mount/countries_data")
 countries_df = Adapter.toDf(countries, sedona)
 countries_df.write.mode(SaveMode.Overwrite).saveAsTable("{0}.COUNTRIES_{1}".format(dbname, username))
 countries_df.printSchema()
