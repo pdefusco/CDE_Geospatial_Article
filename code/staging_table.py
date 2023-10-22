@@ -100,7 +100,7 @@ iot_points_df.createOrReplaceTempView("iot_geo_tmp")
 iot_points_geo_df = sedona.sql("select id, device_id, manufacturer, event_type, event_ts, ST_Point(cast(iot_geo_tmp.latitude as Decimal(24,20)), cast(iot_geo_tmp.longitude as Decimal(24,20))) as arealandmark from iot_geo_tmp")
 iot_points_geo_df.show()
 
-iot_points_geo_df.write.mode(SaveMode.Overwrite).saveAsTable("{0}.IOT_GEO_DEVICES_{1}".format(dbname, username))
+iot_points_geo_df.write.mode("overwrite").saveAsTable("{0}.IOT_GEO_DEVICES_{1}".format(dbname, username))
 iot_points_geo_df.printSchema()
 
 print("\tPOPULATE TABLE(S) COMPLETED")
