@@ -54,7 +54,7 @@ from sedona.spark import *
 
 ## CDE PROPERTIES
 config = configparser.ConfigParser()
-config.read('/app/mount/parameters.conf')
+config.read('/app/mount/jobCode/parameters.conf')
 data_lake_name=config.get("general","data_lake_name")
 username=config.get("general","username")
 
@@ -78,11 +78,7 @@ spark = SparkSession \
 #               CREATE SEDONA CONTEXT
 #---------------------------------------------------
 
-config = SedonaContext.builder().\
-    config('spark.jars.packages',
-           'org.apache.sedona:sedona-spark-shaded-3.0_2.12:1.4.1,'
-           'org.datasyslab:geotools-wrapper:1.4.0-28.2'). \
-    getOrCreate()
+config = SedonaContext.builder().getOrCreate()
 
 sedona = SedonaContext.create(spark)
 

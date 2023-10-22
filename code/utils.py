@@ -58,13 +58,14 @@ class DataGen:
         Method to create dataframe with IoT readings and randomly located latitude and longitude
         -90 to 90 for latitude and -180 to 180 for longitude
         """
+        manufacturers = ["IOT corp", "GEOSPATIAL Inc.", "United Geo Enterprises Ltd", "IOT_Century Corp", "Satellite Devices"]
+
         testDataSpec = (
-            dg.DataGenerator(spark, name="iot", rows=data_rows,partitions=partitions_requested).withIdOutput()
-            .withColumn("internal_device_id", "long", minValue=0x1000000000000,uniqueValues=device_population, omit=True, baseColumnType="hash",)
+            dg.DataGenerator(self.spark, name="iot", rows=row_count,partitions=partitions_num).withIdOutput()
+            .withColumn("internal_device_id", "long", minValue=0x1000000000000,uniqueValues=unique_vals, omit=True, baseColumnType="hash",)
             .withColumn("device_id", "string", format="0x%013x", baseColumn="internal_device_id")
             .withColumn("manufacturer", "string", values=manufacturers, baseColumn="internal_device_id")
             .withColumn("model_ser", "integer", minValue=1, maxValue=11, baseColumn="device_id", baseColumnType="hash", omit=True, )
-            .withColumn("model_line", "string", expr="concat(line, '#', model_ser)", baseColumn=["line", "model_ser"] )
             .withColumn("event_type", "string", values=["activation", "deactivation", "plan change", "telecoms activity","internet activity", "device error"],random=True)
             .withColumn("event_ts", "timestamp", begin="2020-01-01 01:00:00",end="2020-12-31 23:59:00",interval="1 minute", random=True )
             .withColumn("longitude", "float", minValue=-180, maxValue=180, random=True)

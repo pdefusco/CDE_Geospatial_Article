@@ -49,7 +49,7 @@ from utils import *
 
 ## CDE PROPERTIES
 config = configparser.ConfigParser()
-config.read('/app/mount/parameters.conf')
+config.read('/app/mount/jobCode/parameters.conf')
 data_lake_name=config.get("general","data_lake_name")
 username=config.get("general","username")
 
@@ -73,11 +73,7 @@ spark = SparkSession \
 #               CREATE SEDONA CONTEXT
 #---------------------------------------------------
 
-config = SedonaContext.builder().\
-    config('spark.jars.packages',
-           'org.apache.sedona:sedona-spark-shaded-3.0_2.12:1.4.1,'
-           'org.datasyslab:geotools-wrapper:1.4.0-28.2'). \
-    getOrCreate()
+config = SedonaContext.builder().getOrCreate()
 
 sedona = SedonaContext.create(spark)
 
@@ -111,9 +107,9 @@ print("\n")
 print("CREATING COUNTRIES TABLE \n")
 print("\n")
 
-countries = ShapefileReader.readToGeometryRDD(sc, "/app/mount/countries_data")
+countries = ShapefileReader.readToGeometryRDD(sc, "/app/mount/countriesData")
 countries_df = Adapter.toDf(countries, sedona)
-countries_df.write.mode(SaveMode.Overwrite).saveAsTable("{0}.COUNTRIES_{1}".format(dbname, username))
+countries_df.write.mode("overwrite").saveAsTable("{0}.COUNTRIES_{1}".format(dbname, username))
 countries_df.printSchema()
 
 print("\tCOUNTRIES TABLE CREATION COMPLETED")

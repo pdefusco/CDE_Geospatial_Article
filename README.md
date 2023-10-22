@@ -30,15 +30,15 @@ cde resource create --name job_code
 
 ##### Upload JARS to CDE Files Resource
 
-cde resource upload --name job_code --local-path code/sedona-spark-common-3.0_2.12-1.5.0.jar --local-path code/geotools-wrapper-1.5.0-28.2.jar --local-path code/geospatial.py --local-path code/staging_table.py --local-path code/table_setup.py --local-path code/parameters.conf --local-path code/utils.py
+cde resource upload --name job_code --local-path code/geospatial.py --local-path code/staging_table.py --local-path code/table_setup.py --local-path code/parameters.conf --local-path code/utils.py
 
 ##### Create CDE Jobs
 
-cde job create --name tablesetup --application-file table_setup.py --type spark --mount-1-resource job_code --runtime-image-resource-name dex-spark-runtime-sedona-geospatial-pauldefusco --jars geotools-wrapper-1.5.0-28.2.jar,sedona-spark-common-3.0_2.12-1.5.0.jar
+cde job create --name tablesetup --type spark --mount-1-prefix jobCode/ --mount-1-resource job_code --mount-2-prefix countriesData/ --mount-2-resource countries_data --runtime-image-resource-name dex-spark-runtime-sedona-geospatial-pauldefusco --packages org.apache.sedona:sedona-spark-shaded-3.0_2.12:1.5.0,org.datasyslab:geotools-wrapper:1.5.0-28.2 --application-file jobCode/table_setup.py
 
-cde job create --name staging_table --application-file staging_table.py --type spark --mount-1-resource job_code --mount-2-resource countries_data --runtime-image-resource-name dex-spark-runtime-sedona-geospatial-pauldefusco --jars geotools-wrapper-1.5.0-28.2.jar,sedona-spark-common-3.0_2.12-1.5.0.jar
+cde job create --name staging_table --type spark --mount-1-prefix jobCode/ --mount-1-resource job_code --mount-2-prefix countriesData/ --mount-2-resource countries_data --runtime-image-resource-name dex-spark-runtime-sedona-geospatial-pauldefusco --packages org.apache.sedona:sedona-spark-shaded-3.0_2.12:1.5.0,org.datasyslab:geotools-wrapper:1.5.0-28.2 --application-file jobCode/staging_table.py
 
-cde job create --name geospatial --application-file geospatial.py --type spark --mount-1-resource job_code --mount-2-resource countries_data --runtime-image-resource-name dex-spark-runtime-sedona-geospatial-pauldefusco --jars geotools-wrapper-1.5.0-28.2.jar,sedona-spark-common-3.0_2.12-1.5.0.jar
+cde job create --name geospatial --application-file jobCode/geospatial.py --type spark --mount-1-resource job_code --mount-2-resource countries_data --runtime-image-resource-name dex-spark-runtime-sedona-geospatial-pauldefusco --packages org.apache.sedona:sedona-spark-shaded-3.0_2.12:1.5.0,org.datasyslab:geotools-wrapper:1.5.0-28.2
 
 ##### Run CDE Jobs
 

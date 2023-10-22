@@ -6,8 +6,7 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1
 RUN rm /usr/bin/python3
 RUN ln -s /usr/bin/python3.9 /usr/bin/python3
 RUN yum install python39-pip
-RUN /usr/bin/python3.9 -m pip install numpy==1.22.0 pandas==1.2.5 pickleshare==0.7.5 py4j==0.10.9 pyarrow==4.0.1 python-dateutil==2.8.1 six==1.15.0 pyparsing==2.4.7 jmespath
+RUN /usr/bin/python3.9 -m pip install numpy pandas==1.2.5 pickleshare==0.7.5 py4j==0.10.9 pyarrow==4.0.1 python-dateutil==2.8.1 six==1.15.0 pyparsing==2.4.7 jmespath
 RUN /usr/bin/python3.9 -m pip install dbldatagen
-RUN /usr/bin/python3.9 -m pip install keplergl pydeck
-RUN /usr/bin/python3.9 -m pip install apache-sedona==1.5.0
+RUN /usr/bin/python3.9 -m pip install keplergl pydeck apache-sedona==1.5.0
 USER ${DEX_UID}
