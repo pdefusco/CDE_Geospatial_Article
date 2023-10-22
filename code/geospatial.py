@@ -139,7 +139,7 @@ distance_join = """
                 SELECT *
                 FROM iot_geo_df_sample a, {0}.IOT_GEO_DEVICES_{1} b
                 WHERE ST_Distance(a.arealandmark,b.arealandmark) < 2
-                """.format(dbname, username))
+                """.format(dbname, username)
 
 print("SELECTING ALL IOT DEVICES LOCATED WITHIN PROVIDED DISTANCE OF THE TEN PROVIDED IOT DEVICES")
 spark.sql(distance_join).show()

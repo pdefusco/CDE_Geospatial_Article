@@ -1,6 +1,22 @@
 # CDE_Geospatial_Article
 
-### Steps
+### Objective
+
+This git repository supports the Cloudera Community article on using Apache Sedona in Cloudera Data Engineering (CDE). You can run the following commands to set up the Sedona demo in your CDE Virtual Cluster.
+
+Apache Sedona™ is a spatial computing engine that enables developers to easily process spatial data at any scale within modern cluster computing systems such as Apache Spark and Apache Flink. Sedona developers can express their spatial data processing tasks in Spatial SQL, Spatial Python or Spatial R.
+
+CDP Data Engineering is the only cloud-native service purpose-built for enterprise data engineering teams. Building on Apache Spark, Data Engineering is an all-inclusive data engineering toolset that enables orchestration automation with Apache Airflow, advanced pipeline monitoring, visual troubleshooting, and comprehensive management tools to streamline ETL processes across enterprise analytics teams.
+
+Data Engineering is fully integrated with Cloudera Data Platform, enabling end-to-end visibility and security with SDX as well as seamless integrations with CDP services such as Data Warehouse and Machine Learning. Data Engineering on CDP powers consistent, repeatable, and automated data engineering workflows on a hybrid cloud platform anywhere.
+
+### Requirements
+
+The following are required to reproduce the Demo in your CDE Virtual Cluster:
+
+* CDE Service version 1.19 and above
+* A Working installation of the CDE CLI. Instructions to install the CLI are provided [here](https://docs.cloudera.com/data-engineering/cloud/cli-access/topics/cde-cli.html).
+* A working installation of git in your local machine. Please clone this git repository and keep in mind all commands assume they are run in the project's main directory.
 
 ##### Custom Runtime Setup
 
@@ -47,7 +63,3 @@ cde job run --name tablesetup --executor-cores 2 --executor-memory "4g"
 cde job run --name staging_table --executor-cores 2 --executor-memory "4g"
 
 cde job run --name geospatial --executor-cores 2 --executor-memory "4g"
-
-##### Teardown
-
-cde job create cleanup
