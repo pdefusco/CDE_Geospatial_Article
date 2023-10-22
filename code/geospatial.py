@@ -120,15 +120,6 @@ result = sedona.sql(GEOSPATIAL_JOIN)
 result.createOrReplaceTempView("result")
 
 #---------------------------------------------------
-#               GEOSPATIAL GROUP BY
-#---------------------------------------------------
-
-groupedresult = sedona.sql("""SELECT c.NAME_EN, c.country_geom, count(*) as DeviceCount
-                            FROM result c
-                            GROUP BY c.NAME_EN, c.country_geom""")
-groupedresult.show()
-
-#---------------------------------------------------
 #               GEOSPATIAL DISTANCE JOIN
 #---------------------------------------------------
 
