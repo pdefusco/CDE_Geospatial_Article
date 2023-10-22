@@ -43,6 +43,9 @@ import configparser
 import random, os, sys
 from datetime import datetime
 from sedona.spark import *
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, expr, when
+from keplergl import KeplerGl
 
 ## CDE PROPERTIES
 config = configparser.ConfigParser()
@@ -93,70 +96,42 @@ _DEBUG_ = False
 #---------------------------------------------------
 print("JOB STARTED...")
 
-iot_geo_devices_df = spark.sql("SELECT * FROM {0}.IOT_GEO_DEVICES_{1}".format(dbname, username)) #could also checkpoint here but need to set checkpoint dir
-countries_geo_df = spark.sql("SELECT * FROM {0}.COUNTRIES_{1}".format(dbname, username))
+#iot_geo_devices_df = spark.sql("SELECT * FROM {0}.IOT_GEO_DEVICES_{1}".format(dbname, username)) #could also checkpoint here but need to set checkpoint dir
+#countries_geo_df = spark.sql("SELECT * FROM {0}.COUNTRIES_{1}".format(dbname, username))
 
-print("\nSHOW IOT GEO DEVICES DF")
-iot_geo_devices_df.show()
-print("\nSHOW COUNTRIES DF")
-countries_geo_df.show()
+airports = ShapefileReader.readToGeometryRDD(sc, "/app/mount/airportData")
+airports_df = Adapter.toDf(airports, sedona)
+airports_df.createOrReplaceTempView("airport")
+airports_df.printSchema()
 
+countries = ShapefileReader.readToGeometryRDD(sc, "/app/mount/countriesData")
+countries_df = Adapter.toDf(countries, sedona)
+countries_df.createOrReplaceTempView("country")
+countries_df.printSchema()
 
-print("\tREAD TABLE(S) COMPLETED")
+airports_rdd = Adapter.toSpatialRdd(airports_df, "geometry")
+# Drop the duplicate name column in countries_df
+countries_df = countries_df.drop("NAME")
+countries_rdd = Adapter.toSpatialRdd(countries_df, "geometry")
 
-iot_geo_devices_df_rdd=iot_geo_devices_df.rdd
+airports_rdd.analyze()
+countries_rdd.analyze()
 
-# Show partitions on pyspark RDD using
-# getNumPartitions function
-print("Show partitions for iot geo devices\n")
-print(iot_geo_devices_df_rdd.getNumPartitions())
+# 4 is the num partitions used in spatial partitioning. This is an optional parameter
+airports_rdd.spatialPartitioning(GridType.KDBTREE, 4)
+countries_rdd.spatialPartitioning(airports_rdd.getPartitioner())
 
-countries_geo_df_rdd=countries_geo_df.rdd
+buildOnSpatialPartitionedRDD = True
+usingIndex = True
+considerBoundaryIntersection = True
+airports_rdd.buildIndex(IndexType.QUADTREE, buildOnSpatialPartitionedRDD)
 
-print("Show partitions for countries_geo_df_rdd\n")
-print(countries_geo_df_rdd.getNumPartitions())
+result_pair_rdd = JoinQueryRaw.SpatialJoinQueryFlat(airports_rdd, countries_rdd, usingIndex, considerBoundaryIntersection)
 
-iot_geo_devices_df = iot_geo_devices_df.repartition(10)
-#countries_geo_df = countries_geo_df.repartition(10)
+result2 = Adapter.toDf(result_pair_rdd, countries_rdd.fieldNames, airports.fieldNames, sedona)
 
+result2.createOrReplaceTempView("join_result_with_all_cols")
+# Select the columns needed in the join
+result2 = sedona.sql("SELECT leftgeometry as country_geom, NAME_EN, rightgeometry as airport_geom, name FROM join_result_with_all_cols")
 
-#---------------------------------------------------
-#               GEOSPATIAL JOIN
-#---------------------------------------------------
-print("GEOSPATIAL JOIN...")
-
-GEOSPATIAL_JOIN = """
-                    SELECT c.geometry as country_geom,
-                            c.NAME_EN, a.arealandmark as iot_device_location,
-                            a.device_id
-                    FROM {0}.COUNTRIES_{1} c, {2}.IOT_GEO_DEVICES_{3} a
-                    WHERE ST_Contains(c.geometry, a.arealandmark)
-                    """.format(dbname, username, dbname, username)
-
-result = sedona.sql(GEOSPATIAL_JOIN)
-result.explain()
-result.show()
-
-result.createOrReplaceTempView("result")
-
-#---------------------------------------------------
-#               GEOSPATIAL DISTANCE JOIN
-#---------------------------------------------------
-
-iot_geo_df_sample = spark.sql("SELECT * FROM {0}.IOT_GEO_DEVICES_{1} LIMIT 10".format(dbname, username))
-iot_geo_df_sample.createOrReplaceTempView("iot_geo_df_sample")
-
-distance_join = """
-                SELECT *
-                FROM iot_geo_df_sample a, {0}.IOT_GEO_DEVICES_{1} b
-                WHERE ST_Distance(a.arealandmark,b.arealandmark) < 2
-                """.format(dbname, username)
-
-print("SELECTING ALL IOT DEVICES LOCATED WITHIN PROVIDED DISTANCE OF THE TEN PROVIDED IOT DEVICES")
-spark.sql(distance_join).show()
-
-print(iot_geo_df.count())
-print(spark.sql(distance_join).count())
-
-
-print("JOB COMPLETED!\n\n")
+result2.show()
