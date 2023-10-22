@@ -96,7 +96,29 @@ print("JOB STARTED...")
 iot_geo_devices_df = spark.sql("SELECT * FROM {0}.IOT_GEO_DEVICES_{1}".format(dbname, username)) #could also checkpoint here but need to set checkpoint dir
 countries_geo_df = spark.sql("SELECT * FROM {0}.COUNTRIES_{1}".format(dbname, username))
 
+print("\nSHOW IOT GEO DEVICES DF")
+iot_geo_devices_df.show()
+print("\nSHOW COUNTRIES DF")
+countries_geo_df.show()
+
+
 print("\tREAD TABLE(S) COMPLETED")
+
+iot_geo_devices_df_rdd=iot_geo_devices_df.rdd
+
+# Show partitions on pyspark RDD using
+# getNumPartitions function
+print("Show partitions for iot geo devices\n")
+print(iot_geo_devices_df_rdd.getNumPartitions())
+
+countries_geo_df_rdd=countries_geo_df.rdd
+
+print("Show partitions for countries_geo_df_rdd\n")
+print(countries_geo_df_rdd.getNumPartitions())
+
+iot_geo_devices_df = iot_geo_devices_df.repartition(10)
+countries_geo_df = countries_geo_df.repartition(10)
+
 
 #---------------------------------------------------
 #               GEOSPATIAL JOIN
@@ -112,6 +134,8 @@ GEOSPATIAL_JOIN = """
                     """.format(dbname, username, dbname, username)
 
 result = sedona.sql(GEOSPATIAL_JOIN)
+result.explain()
+result.show()
 
 result.createOrReplaceTempView("result")
 

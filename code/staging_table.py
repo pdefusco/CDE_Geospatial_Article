@@ -87,7 +87,7 @@ print("\n")
 
 dg = DataGen(spark, username)
 
-iot_points_df = dg.iot_points_gen(row_count = 10000, unique_vals=10000)
+iot_points_df = dg.iot_points_gen(row_count = 100000, unique_vals=100000)
 iot_points_df.createOrReplaceTempView("iot_geo_tmp")
 
 iot_points_geo_df = sedona.sql("select id, device_id, manufacturer, event_type, event_ts, ST_Point(cast(iot_geo_tmp.latitude as Decimal(24,20)), cast(iot_geo_tmp.longitude as Decimal(24,20))) as arealandmark from iot_geo_tmp")
