@@ -22,7 +22,7 @@ cde resource create --name countries_data
 
 ##### Upload files to Countries Data Files Resource
 
-cde resource upload-archive --name countries_data --local-path ne_50m_admin_0_countries_lakes.zip
+cde resource upload-archive --name countries_data --local-path data/ne_50m_admin_0_countries_lakes.zip
 
 ##### Create CDE Files Resource for Jars and Scripts
 
