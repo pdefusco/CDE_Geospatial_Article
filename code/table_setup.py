@@ -55,6 +55,8 @@ dbname = "CDE_DEMO_{}".format(username)
 
 print("\nUsing DB Name: ", dbname)
 
+geoparquetoutputlocation = "CDE_GEOSPATIAL"
+
 #---------------------------------------------------
 #               CREATE SPARK SESSION WITH ICEBERG
 #---------------------------------------------------
@@ -80,12 +82,12 @@ sc.setSystemProperty("sedona.global.charset", "utf8")
 #       SQL CLEANUP: DATABASES, TABLES, VIEWS
 #---------------------------------------------------
 print("JOB STARTED...")
-spark.sql("DROP DATABASE IF EXISTS {} CASCADE".format(dbname))
+sedona.sql("DROP DATABASE IF EXISTS {} CASCADE".format(dbname))
 
 ##---------------------------------------------------
 ##                 CREATE DATABASES
 ##---------------------------------------------------
-spark.sql("CREATE DATABASE IF NOT EXISTS {}".format(dbname))
+sedona.sql("CREATE DATABASE IF NOT EXISTS {}".format(dbname))
 
 ##---------------------------------------------------
 ##                 SHOW DATABASES
@@ -93,20 +95,36 @@ spark.sql("CREATE DATABASE IF NOT EXISTS {}".format(dbname))
 
 # Show databases
 print("SHOW DATABASES LIKE '{}'".format(dbname))
-spark.sql("SHOW DATABASES LIKE '{}'".format(dbname)).show()
+sedona.sql("SHOW DATABASES LIKE '{}'".format(dbname)).show()
 print("\n")
 
 #-----------------------------------------------------------------------------------
 # CREATE TABLE FROM DATA IN CDE FILES RESOURCE
 #-----------------------------------------------------------------------------------
 
-print("CREATING COUNTRIES TABLE \n")
+print("CREATING COUNTRIES RDD FROM FILE \n")
 print("\n")
 
-countries = ShapefileReader.readToGeometryRDD(sc, "/app/mount/countriesData")
-countries_df = Adapter.toDf(countries, sedona)
-countries_df.write.mode("overwrite").saveAsTable("{0}.COUNTRIES_{1}".format(dbname, username))
+countries_rdd = ShapefileReader.readToGeometryRDD(sc, "/app/mount/countriesData")
+
+print("SAVING COUNTRIES RDD TO DISTRIBUTED OBJECT FILE \n")
+print("\n")
+#countries_rdd.indexedRawRDD.saveAsObjectFile(data_lake_name + geoparquetoutputlocation + "/DIST_OBJ_FILE/")
+countries_rdd.saveAsGeoJSON(data_lake_name + geoparquetoutputlocation + "/countries_1.json")
+
+print("CREATING COUNTRIES DF FROM RDD \n")
+print("\n")
+
+countries_df = Adapter.toDf(countries_rdd, sedona)
 countries_df.printSchema()
+
+print("SAVING COUNTRIES DF TO GEOPARQUET \n")
+print("\n")
+
+countries_df.write.mode("overwrite").format("geoparquet").save(data_lake_name + geoparquetoutputlocation + "/countries.parquet")
+
+#countries_df.write.mode("overwrite").saveAsTable("{0}.COUNTRIES_{1}".format(dbname, username))
+#df.write.format("geoparquet").save(geoparquetoutputlocation + "/GeoParquet_File_Name.parquet")
 
 print("\tCOUNTRIES TABLE CREATION COMPLETED")
 
@@ -116,5 +134,5 @@ print("\tCOUNTRIES TABLE CREATION COMPLETED")
 
 # Show databases
 print("SHOW DATABASES LIKE '{}'".format(dbname))
-spark.sql("SHOW DATABASES LIKE '{}'".format(dbname)).show()
+sedona.sql("SHOW DATABASES LIKE '{}'".format(dbname)).show()
 print("\n")

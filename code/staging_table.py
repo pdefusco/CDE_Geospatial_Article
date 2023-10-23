@@ -57,6 +57,8 @@ dbname = "CDE_DEMO_{}".format(username)
 
 print("\nUsing DB Name: ", dbname)
 
+geoparquetoutputlocation = "CDE_GEOSPATIAL"
+
 #---------------------------------------------------
 #               CREATE SPARK SESSION WITH ICEBERG
 #---------------------------------------------------
@@ -90,11 +92,18 @@ dg = DataGen(spark, username)
 iot_points_df = dg.iot_points_gen(row_count = 100000, unique_vals=100000)
 iot_points_df.createOrReplaceTempView("iot_geo_tmp")
 
-iot_points_geo_df = sedona.sql("select id, device_id, manufacturer, event_type, event_ts, ST_Point(cast(iot_geo_tmp.latitude as Decimal(24,20)), cast(iot_geo_tmp.longitude as Decimal(24,20))) as arealandmark from iot_geo_tmp")
+iot_points_geo_df = sedona.sql("SELECT id, device_id, manufacturer, event_type, event_ts, \
+                                ST_Point(CAST(iot_geo_tmp.latitude as Decimal(24,20)), \
+                                CAST(iot_geo_tmp.longitude as Decimal(24,20))) as arealandmark \
+                                FROM iot_geo_tmp")
 iot_points_geo_df.show()
 
-iot_points_geo_df.write.mode("overwrite").saveAsTable("{0}.IOT_GEO_DEVICES_{1}".format(dbname, username))
+#iot_points_geo_df.write.mode("overwrite").saveAsTable("{0}.IOT_GEO_DEVICES_{1}".format(dbname, username))
+iot_points_geo_df.write.mode("overwrite").format("geoparquet").save(data_lake_name + geoparquetoutputlocation + "/iot_geo_devices.parquet")
 iot_points_geo_df.printSchema()
+
+iotSpatialRDD = Adapter.toSpatialRdd(iot_points_geo_df, "arealandmark")
+iotSpatialRDD.saveAsGeoJSON(data_lake_name + geoparquetoutputlocation + "/iot_spatial_1.json")
 
 print("\tPOPULATE TABLE(S) COMPLETED")
 

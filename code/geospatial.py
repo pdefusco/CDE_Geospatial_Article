@@ -56,6 +56,8 @@ dbname = "CDE_DEMO_{}".format(username)
 
 print("\nUsing DB Name: ", dbname)
 
+geoparquetoutputlocation = "CDE_GEOSPATIAL"
+
 #---------------------------------------------------
 #               CREATE SPARK SESSION
 #---------------------------------------------------
@@ -79,46 +81,60 @@ sc.setSystemProperty("sedona.global.charset", "utf8")
 
 # Show catalog and database
 print("SHOW CURRENT NAMESPACE")
-spark.sql("SHOW CURRENT NAMESPACE").show()
-spark.sql("USE {}".format(dbname))
+sedona.sql("SHOW CURRENT NAMESPACE").show()
+sedona.sql("USE {}".format(dbname))
 
 # Show catalog and database
 print("SHOW NEW NAMESPACE IN USE\n")
-spark.sql("SHOW CURRENT NAMESPACE").show()
+sedona.sql("SHOW CURRENT NAMESPACE").show()
 
 _DEBUG_ = False
 
 #---------------------------------------------------
-#                READ SOURCE TABLES
+#                READ SOURCE FILES
 #---------------------------------------------------
-print("JOB STARTED...")
 
-iot_geo_devices_df = spark.sql("SELECT * FROM {0}.IOT_GEO_DEVICES_{1}".format(dbname, username)) #could also checkpoint here but need to set checkpoint dir
-countries_geo_df = spark.sql("SELECT * FROM {0}.COUNTRIES_{1}".format(dbname, username))
+from sedona.core.formatMapper import GeoJsonReader
+
+geo_json_file_location = data_lake_name + geoparquetoutputlocation + "/iot_spatial_1.json"
+saved_rdd_iot = GeoJsonReader.readToGeometryRDD(sc, geo_json_file_location)
+geo_json_file_location = data_lake_name + geoparquetoutputlocation + "/countries_1.json"
+saved_rdd_countries = GeoJsonReader.readToGeometryRDD(sc, geo_json_file_location)
+
+
+print("JOB STARTED...")
+#saved_rdd_iot = SpatialRDD()
+#saved_rdd_iot = load_spatial_rdd_from_disc(sc, data_lake_name + geoparquetoutputlocation + "/iot_spatial.json", GeoType.GEOMETRY)
+
+#saved_rdd_countries = SpatialRDD()
+#saved_rdd_countries.indexedRawRDD = load_spatial_index_rdd_from_disc(sc, data_lake_name + geoparquetoutputlocation + "/countries.json")
+
+#iot_geo_devices_df = sedona.read.format("geoparquet").load(data_lake_name + geoparquetoutputlocation + "/iot_geo_devices.parquet")
+#iot_geo_devices_df.printSchema()
+
+#countries = ShapefileReader.readToGeometryRDD(sc, "data/ne_50m_admin_0_countries_lakes/")
+iot_geo_devices_df = Adapter.toDf(saved_rdd_iot, sedona)
+#iot_geo_devices_df.createOrReplaceTempView("country")
+iot_geo_devices_df.printSchema()
+
+#countries = ShapefileReader.readToGeometryRDD(sc, "data/ne_50m_admin_0_countries_lakes/")
+countries_geo_df = Adapter.toDf(saved_rdd_countries, sedona)
+#countries_geo_df.createOrReplaceTempView("country")
+countries_geo_df.printSchema()
+
+#countries_geo_df = sedona.read.format("geoparquet").load(data_lake_name + geoparquetoutputlocation + "/countries.jspon")
+#countries_geo_df.printSchema()
+
+#iot_geo_devices_df = sedona.sql("SELECT * FROM {0}.IOT_GEO_DEVICES_{1}".format(dbname, username)) #could also checkpoint here but need to set checkpoint dir
+#countries_geo_df = sedona.sql("SELECT * FROM {0}.COUNTRIES_{1}".format(dbname, username))
 
 print("\nSHOW IOT GEO DEVICES DF")
-iot_geo_devices_df.show()
+#iot_geo_devices_df.show()
 print("\nSHOW COUNTRIES DF")
-countries_geo_df.show()
+#countries_geo_df.show()
 
-
-print("\tREAD TABLE(S) COMPLETED")
-
-iot_geo_devices_df_rdd=iot_geo_devices_df.rdd
-
-# Show partitions on pyspark RDD using
-# getNumPartitions function
-print("Show partitions for iot geo devices\n")
-print(iot_geo_devices_df_rdd.getNumPartitions())
-
-countries_geo_df_rdd=countries_geo_df.rdd
-
-print("Show partitions for countries_geo_df_rdd\n")
-print(countries_geo_df_rdd.getNumPartitions())
-
-iot_geo_devices_df = iot_geo_devices_df.repartition(10)
-#countries_geo_df = countries_geo_df.repartition(10)
-
+iot_geo_devices_df.createOrReplaceTempView("IOT_GEO_DEVICES_{}".format(username))
+countries_geo_df.createOrReplaceTempView("COUNTRIES_{}".format(username))
 
 #---------------------------------------------------
 #               GEOSPATIAL JOIN
@@ -127,11 +143,12 @@ print("GEOSPATIAL JOIN...")
 
 GEOSPATIAL_JOIN = """
                     SELECT c.geometry as country_geom,
-                            c.NAME_EN, a.arealandmark as iot_device_location,
+                            c._c25,
+                            a.geometry as iot_device_location,
                             a.device_id
-                    FROM {0}.COUNTRIES_{1} c, {2}.IOT_GEO_DEVICES_{3} a
-                    WHERE ST_Contains(c.geometry, a.arealandmark)
-                    """.format(dbname, username, dbname, username)
+                    FROM COUNTRIES_{0} c, IOT_GEO_DEVICES_{0} a
+                    WHERE ST_Contains(c.geometry, a.geometry)
+                    """.format(username)
 
 result = sedona.sql(GEOSPATIAL_JOIN)
 result.explain()
@@ -143,20 +160,24 @@ result.createOrReplaceTempView("result")
 #               GEOSPATIAL DISTANCE JOIN
 #---------------------------------------------------
 
-iot_geo_df_sample = spark.sql("SELECT * FROM {0}.IOT_GEO_DEVICES_{1} LIMIT 10".format(dbname, username))
-iot_geo_df_sample.createOrReplaceTempView("iot_geo_df_sample")
+#iot_geo_df_sample = sedona.sql("SELECT * FROM IOT_GEO_DEVICES_{} LIMIT 10".format(username))
+
+#iot_geo_df_sample.createOrReplaceTempView("iot_geo_df_sample_{}".format(username))
+
+'''iot_rdd_topten = saved_rdd_iot.top(10)
+iot_df_topten = Adapter.toDf(iot_rdd_topten, sedona)
+iot_df_topten.createOrReplaceTempView("IOT_GEO_DEVICES_TOPTEN_{}".format(username))
 
 distance_join = """
                 SELECT *
-                FROM iot_geo_df_sample a, {0}.IOT_GEO_DEVICES_{1} b
-                WHERE ST_Distance(a.arealandmark,b.arealandmark) < 2
-                """.format(dbname, username)
+                FROM IOT_GEO_DEVICES_{0} a, IOT_GEO_DEVICES_TOPTEN_{0} b
+                WHERE ST_Distance(a.geometry,b.geometry) < 2
+                """.format(username)
 
-print("SELECTING ALL IOT DEVICES LOCATED WITHIN PROVIDED DISTANCE OF THE TEN PROVIDED IOT DEVICES")
-spark.sql(distance_join).show()
+print("SELECTING ALL IOT DEVICES LOCATED WITHIN PROVIDED DISTANCE OF THE TEN SELECTED IOT DEVICES")
+sedona.sql(distance_join).show()
 
 print(iot_geo_df.count())
-print(spark.sql(distance_join).count())
-
+print(sedona.sql(distance_join).count())'''
 
 print("JOB COMPLETED!\n\n")
