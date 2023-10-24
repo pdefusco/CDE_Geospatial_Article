@@ -37,13 +37,14 @@
 # #  Author(s): Paul de Fusco
 #***************************************************************************/
 
-from os.path import exists
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
-from utils import *
+import configparser
+import random, os, sys
 from datetime import datetime
-import sys, random, os, json, random, configparser
 from sedona.spark import *
+from keplergl import KeplerGl
+from pyspark.sql.functions import col, expr, when
 
 ## CDE PROPERTIES
 config = configparser.ConfigParser()
@@ -60,7 +61,7 @@ print("\nUsing DB Name: ", dbname)
 geoparquetoutputlocation = "CDE_GEOSPATIAL"
 
 #---------------------------------------------------
-#               CREATE SPARK SESSION WITH ICEBERG
+#               CREATE SPARK SESSION
 #---------------------------------------------------
 
 spark = SparkSession \
@@ -80,31 +81,60 @@ sedona = SedonaContext.create(spark)
 sc = sedona.sparkContext
 sc.setSystemProperty("sedona.global.charset", "utf8")
 
-#-----------------------------------------------------------------------------------
-# CREATE STAGING DATASET 1 WITH SOME TARGET ID'S
-#-----------------------------------------------------------------------------------
+# Show catalog and database
+print("SHOW CURRENT NAMESPACE")
+sedona.sql("SHOW CURRENT NAMESPACE").show()
+sedona.sql("USE {}".format(dbname))
 
-print("LOADING IOT DEVICES\n")
-print("\n")
+# Show catalog and database
+print("SHOW NEW NAMESPACE IN USE\n")
+sedona.sql("SHOW CURRENT NAMESPACE").show()
 
-dg = DataGen(spark, username)
+_DEBUG_ = False
 
-iot_points_df = dg.iot_points_gen(row_count = 100000, unique_vals=100000)
-iot_points_df.createOrReplaceTempView("iot_geo_tmp")
+#---------------------------------------------------
+#                READ SOURCE FILES
+#---------------------------------------------------
 
-iot_points_geo_df = sedona.sql("SELECT id, device_id, manufacturer, event_type, event_ts, \
-                                ST_Point(CAST(iot_geo_tmp.latitude as Decimal(24,20)), \
-                                CAST(iot_geo_tmp.longitude as Decimal(24,20))) as arealandmark \
-                                FROM iot_geo_tmp")
-iot_points_geo_df.show()
+from sedona.core.formatMapper import GeoJsonReader
 
-#iot_points_geo_df.write.mode("overwrite").saveAsTable("{0}.IOT_GEO_DEVICES_{1}".format(dbname, username))
-iot_points_geo_df.write.mode("overwrite").format("geoparquet").save(data_lake_name + geoparquetoutputlocation + "/iot_geo_devices.parquet")
-iot_points_geo_df.printSchema()
+geo_json_file_location = data_lake_name + geoparquetoutputlocation + "/iot_spatial.json"
+saved_rdd_iot = GeoJsonReader.readToGeometryRDD(sc, geo_json_file_location)
 
-iotSpatialRDD = Adapter.toSpatialRdd(iot_points_geo_df, "arealandmark")
-iotSpatialRDD.saveAsGeoJSON(data_lake_name + geoparquetoutputlocation + "/iot_spatial_1.json")
+saved_rdd_countries = ShapefileReader.readToGeometryRDD(sc, "/app/mount/countriesData")
 
-print("\tPOPULATE TABLE(S) COMPLETED")
+iot_geo_devices_df = Adapter.toDf(saved_rdd_iot, sedona)
+iot_geo_devices_df.printSchema()
 
-print("JOB COMPLETED.\n\n")
+countries_geo_df = Adapter.toDf(saved_rdd_countries, sedona)
+countries_geo_df.printSchema()
+
+print("\nSHOW IOT GEO DEVICES DF")
+#iot_geo_devices_df.show()
+print("\nSHOW COUNTRIES DF")
+#countries_geo_df.show()
+
+iot_geo_devices_df.createOrReplaceTempView("IOT_GEO_DEVICES_{}".format(username))
+countries_geo_df.createOrReplaceTempView("COUNTRIES_{}".format(username))
+
+#---------------------------------------------------
+#               GEOSPATIAL JOIN
+#---------------------------------------------------
+print("GEOSPATIAL JOIN...")
+
+GEOSPATIAL_JOIN = """
+                    SELECT c.geometry as country_geom,
+                            c.NAME_EN,
+                            a.geometry as iot_device_location,
+                            a.device_id
+                    FROM COUNTRIES_{0} c, IOT_GEO_DEVICES_{0} a
+                    WHERE ST_Contains(c.geometry, a.geometry)
+                    """.format(username)
+
+result = sedona.sql(GEOSPATIAL_JOIN)
+result.explain()
+result.show()
+
+result.createOrReplaceTempView("result")
+
+print("JOB COMPLETED!\n\n")

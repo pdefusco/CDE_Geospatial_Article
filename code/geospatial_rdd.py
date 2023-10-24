@@ -37,15 +37,15 @@
 # #  Author(s): Paul de Fusco
 #***************************************************************************/
 
+from os.path import exists
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
-import configparser
-import random, os, sys
+from utils import *
 from datetime import datetime
+import sys, random, os, json, random, configparser
 from sedona.spark import *
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, expr, when
-from keplergl import KeplerGl
+from shapely.geometry import Point
+from shapely.geometry import Polygon
 
 ## CDE PROPERTIES
 config = configparser.ConfigParser()
@@ -59,8 +59,10 @@ dbname = "CDE_DEMO_{}".format(username)
 
 print("\nUsing DB Name: ", dbname)
 
+geoparquetoutputlocation = "CDE_GEOSPATIAL"
+
 #---------------------------------------------------
-#               CREATE SPARK SESSION
+#               CREATE SPARK SESSION WITH ICEBERG
 #---------------------------------------------------
 
 spark = SparkSession \
@@ -80,58 +82,125 @@ sedona = SedonaContext.create(spark)
 sc = sedona.sparkContext
 sc.setSystemProperty("sedona.global.charset", "utf8")
 
-# Show catalog and database
-print("SHOW CURRENT NAMESPACE")
-spark.sql("SHOW CURRENT NAMESPACE").show()
-spark.sql("USE {}".format(dbname))
-
-# Show catalog and database
-print("SHOW NEW NAMESPACE IN USE\n")
-spark.sql("SHOW CURRENT NAMESPACE").show()
-
-_DEBUG_ = False
-
 #---------------------------------------------------
-#                READ SOURCE TABLES
+#       SQL CLEANUP: DATABASES, TABLES, VIEWS
 #---------------------------------------------------
 print("JOB STARTED...")
+sedona.sql("DROP DATABASE IF EXISTS {} CASCADE".format(dbname))
 
-#iot_geo_devices_df = spark.sql("SELECT * FROM {0}.IOT_GEO_DEVICES_{1}".format(dbname, username)) #could also checkpoint here but need to set checkpoint dir
-#countries_geo_df = spark.sql("SELECT * FROM {0}.COUNTRIES_{1}".format(dbname, username))
+sedona.sql("CREATE DATABASE IF NOT EXISTS {}".format(dbname))
 
-airports = ShapefileReader.readToGeometryRDD(sc, "/app/mount/airportData")
-airports_df = Adapter.toDf(airports, sedona)
-airports_df.createOrReplaceTempView("airport")
-airports_df.printSchema()
+print("SHOW DATABASES LIKE '{}'".format(dbname))
+sedona.sql("SHOW DATABASES LIKE '{}'".format(dbname)).show()
+print("\n")
 
-countries = ShapefileReader.readToGeometryRDD(sc, "/app/mount/countriesData")
-countries_df = Adapter.toDf(countries, sedona)
-countries_df.createOrReplaceTempView("country")
+#-----------------------------------------------------------------------------------
+# CREATE TABLE FROM DATA IN CDE FILES RESOURCE
+#-----------------------------------------------------------------------------------
+
+print("CREATING COUNTRIES RDD FROM FILE \n")
+print("\n")
+
+countries_rdd = ShapefileReader.readToGeometryRDD(sc, "/app/mount/countriesData")
+
+print("SAVING COUNTRIES RDD TO GEOJSON FILE \n")
+print("\n")
+
+try:
+    countries_rdd.saveAsGeoJSON(data_lake_name + geoparquetoutputlocation + "/countries.json")
+except Exception as e:
+    print("RDD NOT written successfully to cloud storage")
+    print("\n")
+    print(f'caught {type(e)}: e')
+    print(e)
+
+print("CREATING COUNTRIES DF FROM RDD \n")
+print("\n")
+
+countries_df = Adapter.toDf(countries_rdd, sedona)
 countries_df.printSchema()
 
-airports_rdd = Adapter.toSpatialRdd(airports_df, "geometry")
-# Drop the duplicate name column in countries_df
-countries_df = countries_df.drop("NAME")
-countries_rdd = Adapter.toSpatialRdd(countries_df, "geometry")
+print("SAVING COUNTRIES DF TO GEOPARQUET \n")
+print("\n")
 
-airports_rdd.analyze()
-countries_rdd.analyze()
+countries_df.write.mode("overwrite").format("geoparquet").save(data_lake_name + geoparquetoutputlocation + "/countries.parquet")
 
-# 4 is the num partitions used in spatial partitioning. This is an optional parameter
-airports_rdd.spatialPartitioning(GridType.KDBTREE, 4)
-countries_rdd.spatialPartitioning(airports_rdd.getPartitioner())
+print("\tCOUNTRIES TABLE CREATION COMPLETED")
 
-buildOnSpatialPartitionedRDD = True
-usingIndex = True
-considerBoundaryIntersection = True
-airports_rdd.buildIndex(IndexType.QUADTREE, buildOnSpatialPartitionedRDD)
+#-----------------------------------------------------------------------------------
+# CREATE IOT DEVICES DATASET
+#-----------------------------------------------------------------------------------
 
-result_pair_rdd = JoinQueryRaw.SpatialJoinQueryFlat(airports_rdd, countries_rdd, usingIndex, considerBoundaryIntersection)
+print("CREATING IOT DEVICES\n")
+print("\n")
 
-result2 = Adapter.toDf(result_pair_rdd, countries_rdd.fieldNames, airports.fieldNames, sedona)
+dg = DataGen(spark, username)
 
-result2.createOrReplaceTempView("join_result_with_all_cols")
-# Select the columns needed in the join
-result2 = sedona.sql("SELECT leftgeometry as country_geom, NAME_EN, rightgeometry as airport_geom, name FROM join_result_with_all_cols")
+iot_points_df = dg.iot_points_gen(row_count = 100000, unique_vals=100000)
+iot_points_df.createOrReplaceTempView("iot_geo_tmp")
 
-result2.show()
+iot_points_geo_df = sedona.sql("SELECT id, device_id, manufacturer, event_type, event_ts, \
+                                ST_Point(CAST(iot_geo_tmp.latitude as Decimal(24,20)), \
+                                CAST(iot_geo_tmp.longitude as Decimal(24,20))) as arealandmark \
+                                FROM iot_geo_tmp")
+iot_points_geo_df.show()
+
+#-----------------------------------------------------------------------------------
+# SAVE IOT DEVICES TO GEOPARQUET AND GEOJSON FILES IN CLOUD STORAGE
+#-----------------------------------------------------------------------------------
+
+#iot_points_geo_df.write.mode("overwrite").saveAsTable("{0}.IOT_GEO_DEVICES_{1}".format(dbname, username))
+iot_points_geo_df.write.mode("overwrite").format("geoparquet").save(data_lake_name + geoparquetoutputlocation + "/iot_geo_devices.parquet")
+iot_points_geo_df.printSchema()
+
+#-----------------------------------------------------------------------------------
+# USE SEDONA RDD API TO ANALYZE DATA
+#-----------------------------------------------------------------------------------
+
+print("\nAdapter allow you to convert geospatial data types introduced with sedona to other ones")
+iotSpatialRDD = Adapter.toSpatialRdd(iot_points_geo_df, "arealandmark")
+
+print("\nSave iotSpatialRDD as GeoJSON File in Cloud Storage")
+try:
+    iotSpatialRDD.saveAsGeoJSON(data_lake_name + geoparquetoutputlocation + "/iot_spatial.json")
+except Exception as e:
+    print("RDD NOT written successfully to cloud storage")
+    print("\n")
+    print(f'caught {type(e)}: e')
+    print(e)
+
+print("\nRun Analyze Function on iotSpatialRDD")
+iotSpatialRDD.analyze()
+
+print("\nTake One Row from iotSpatialRDD")
+iotSpatialRDD.rawSpatialRDD.take(1)
+
+print("\nApproximate Count of iotSpatialRDD")
+print(iotSpatialRDD.approximateTotalCount)
+
+print("\nCalculate number of records without duplicates")
+print(iotSpatialRDD.countWithoutDuplicates())
+
+print("\nApache Sedona spatial partitioning method can significantly speed up the join query. \
+        Three spatial partitioning methods are available: KDB-Tree, Quad-Tree and R-Tree. \
+        Two SpatialRDD must be partitioned by the same way when joined.")
+
+print("\nSpatial partitioning data")
+iotSpatialRDD.spatialPartitioning(GridType.KDBTREE)
+
+print("\nSpatial Index")
+print("\nApache Sedona provides two types of spatial indexes, \
+        Quad-Tree and R-Tree. Once you specify an index type, \
+        Apache Sedona will build a local tree index on each of the SpatialRDD partition.")
+
+print("\nApply map functions, for example distance to Point(52 21)")
+iotSpatialRDD.rawSpatialRDD.map(lambda x: x.geom.distance(Point(21, 52))).take(5)
+
+print("\nKNN QUERY")
+print("Which k number of geometries lays closest to other geometry.")
+
+result = KNNQuery.SpatialKnnQuery(iotSpatialRDD, Point(-84.01, 34.01), 5, False)
+print("\nKNN QUERY RESULTS")
+print(result)
+
+print("JOB COMPLETED.\n\n")

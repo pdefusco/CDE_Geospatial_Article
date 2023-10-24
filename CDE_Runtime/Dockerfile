@@ -8,5 +8,5 @@ RUN ln -s /usr/bin/python3.9 /usr/bin/python3
 RUN yum install python39-pip
 RUN /usr/bin/python3.9 -m pip install numpy pandas==1.2.5 pickleshare==0.7.5 py4j==0.10.9 pyarrow==4.0.1 python-dateutil==2.8.1 six==1.15.0 pyparsing==2.4.7 jmespath
 RUN /usr/bin/python3.9 -m pip install dbldatagen
-RUN /usr/bin/python3.9 -m pip install keplergl pydeck apache-sedona==1.5.0
+RUN /usr/bin/python3.9 -m pip install keplergl pydeck shapely apache-sedona==1.5.0
 USER ${DEX_UID}
