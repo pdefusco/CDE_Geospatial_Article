@@ -54,7 +54,7 @@ cde resource upload-archive --name countries_data --local-path data/ne_50m_admin
 cde resource create --name job_code
 ```
 
-##### Upload JARS to CDE Files Resource
+##### Upload Code and Depdencies to CDE Files Resource
 
 ```
 cde resource upload --name job_code --local-path code/geospatial_joins.py --local-path code/geospatial_rdd.py --local-path code/parameters.conf --local-path code/utils.py
