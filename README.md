@@ -2,9 +2,9 @@
 
 ### Objective
 
-This git repository supports the Cloudera Community article on using Apache Sedona in Cloudera Data Engineering (CDE). You can run the following commands to set up the Sedona demo in your CDE Virtual Cluster.
+This git repository supports the [Cloudera Community article on using Apache Sedona in Cloudera Data Engineering (CDE)](https://community.cloudera.com/t5/Community-Articles/Spark-Geospatial-with-Apache-Sedona-in-Cloudera-Data/ta-p/378086). You can run the following commands to set up the Sedona demo in your CDE Virtual Cluster.
 
-Apache Sedona™ is a spatial computing engine that enables developers to easily process spatial data at any scale within modern cluster computing systems such as Apache Spark and Apache Flink. Sedona developers can express their spatial data processing tasks in Spatial SQL, Spatial Python or Spatial R.
+Apache Sedona™ (formerly known as "GeoSpark") is a spatial computing engine that enables developers to easily process spatial data at any scale within modern cluster computing systems such as Apache Spark and Apache Flink. Sedona developers can express their spatial data processing tasks in Spatial SQL, Spatial Python or Spatial R.
 
 CDP Data Engineering is the only cloud-native service purpose-built for enterprise data engineering teams. Building on Apache Spark, Data Engineering is an all-inclusive data engineering toolset that enables orchestration automation with Apache Airflow, advanced pipeline monitoring, visual troubleshooting, and comprehensive management tools to streamline ETL processes across enterprise analytics teams.
 
