@@ -77,3 +77,8 @@ cde job run --name geospatial_rdd --executor-cores 2 --executor-memory "4g"
 
 cde job run --name geospatial_joins --executor-cores 2 --executor-memory "4g"
 ```
+
+## References
+
+[Apache Sedona Documentation](https://sedona.apache.org/1.5.0/)
+[Cloudera Data Engineering Documentation](https://docs.cloudera.com/data-engineering/cloud/index.html)
